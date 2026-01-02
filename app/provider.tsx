@@ -9,14 +9,21 @@ const Provider = ({
 }: { children: React.ReactNode }) => {
 
     const [userDetails, setUserDetails] = useState<User | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         createUser();
     }, []);
 
     const createUser = async () => {
-        const result = await axios.post('/api/user');
-        setUserDetails(result.data.user);
+        try {
+            setError(null);
+            const result = await axios.post('/api/user');
+            setUserDetails(result.data.user);
+        } catch (error) {
+            setError("Failed to create user");
+        }
+
     }
 
     return (

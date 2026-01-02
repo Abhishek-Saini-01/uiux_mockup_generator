@@ -5,28 +5,41 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-    const user = await currentUser();
+    try {
 
-    const userEmail = user?.emailAddresses[0].emailAddress;
-    if (!userEmail) {
-        return NextResponse.json({ error: "Email not found" }, { status: 404 });
-    }
+        const user = await currentUser();
 
-    const users = await db.select().from(usersTable).where(
-        eq(usersTable.email, userEmail)
-    );
-    if (users.length === 0) {
+        const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+        if (!userEmail) {
+            return NextResponse.json({ error: "Email not found" }, { status: 404 });
+        }
+
         const data = {
             name: user.fullName ?? 'User',
             email: userEmail
         }
-        const result = await db.insert(usersTable).values(data).returning();
-        return NextResponse.json({
-            user: result[0]
-        }, { status: 200 });
-    }
 
-    return NextResponse.json({
-        user: users[0]
-    }, { status: 200 });
+        const result = await db.insert(usersTable)
+            .values(data)
+            .onConflictDoNothing({ target: usersTable.email })
+            .returning();
+
+        if (result.length > 0) {
+            return NextResponse.json({
+                user: result[0]
+            }, { status: 200 });
+        }
+
+        const existingUser = await db.select().from(usersTable).where(
+            eq(usersTable.email, userEmail)
+        ).limit(1);
+
+        return NextResponse.json({
+            user: existingUser[0]
+        }, { status: 200 });
+
+    } catch (error) {
+        console.log("Error creating user", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
 }
